@@ -29,8 +29,7 @@ func (p *Plugin) NexusRequestEx(ctx context.Context, requestMethod string, reque
 		requestSetup(req)
 	}
 
-	// TODO: support more authz schemes
-	req.Header.Set("Authorization", "Basic "+p.Settings.AuthBase64)
+	req.Header.Set(p.AuthHeader, p.AuthValue)
 
 	res, err := c.Do(req)
 	if err != nil {

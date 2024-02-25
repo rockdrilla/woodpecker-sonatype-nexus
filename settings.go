@@ -27,23 +27,57 @@ func (p *Plugin) parseSettings() error {
 	}
 	p.RestUrl = restUrl
 
-	p.Settings.AuthBase64 = strings.TrimSpace(p.Settings.AuthBase64)
-	if (p.Settings.AuthPlain == "") && (p.Settings.AuthBase64 == "") {
-		return errors.New("empty nexus.auth.plain/nexus.auth.base64")
+	if (p.Settings.AuthPlain == "") && (p.Settings.AuthBase64 == "") && (p.Settings.AuthHttpHeader == "") {
+		return errors.New("missing nexus.auth/nexus.auth.*")
 	}
-	if p.Settings.AuthBase64 == "" {
-		if !strings.Contains(p.Settings.AuthPlain, ":") {
-			return errors.New("nexus.auth.plain does not contain ':'")
+	if p.Settings.AuthHttpHeader != "" {
+		if !strings.Contains(p.Settings.AuthHttpHeader, "=") {
+			return errors.New("nexus.auth.header does not contain '='")
 		}
-		p.Settings.AuthBase64 = base64.StdEncoding.EncodeToString([]byte(p.Settings.AuthPlain))
+
+		parts := strings.SplitN(p.Settings.AuthHttpHeader, "=", 2)
+		if parts[0] == "" {
+			return errors.New("nexus.auth.header: empty Header")
+		}
+		if parts[1] == "" {
+			return errors.New("nexus.auth.header: empty Value")
+		}
+		p.AuthHeader = parts[0]
+		p.AuthValue = parts[1]
+
+		if p.Settings.AuthBase64 != "" {
+			log.Info().Msgf("'nexus.auth.base64' is ignored while 'nexus.auth.header' is in effect")
+		}
+		if p.Settings.AuthPlain != "" {
+			log.Info().Msgf("'nexus.auth' is ignored while 'nexus.auth.header' is in effect")
+		}
+	} else {
+		// proceed with HTTP Basic auth
+		p.AuthHeader = "Authorization"
+
+		if p.Settings.AuthBase64 != "" {
+			if p.Settings.AuthPlain != "" {
+				log.Info().Msgf("'nexus.auth' is ignored while 'nexus.auth.base64' is in effect")
+			}
+		} else {
+			if !strings.Contains(p.Settings.AuthPlain, ":") {
+				return errors.New("nexus.auth does not contain ':'")
+			}
+
+			p.Settings.AuthBase64 = base64.StdEncoding.EncodeToString([]byte(p.Settings.AuthPlain))
+		}
+
+		p.AuthValue = "Basic " + p.Settings.AuthBase64
 	}
 
-	// paranoia area
-	os.Unsetenv("PLUGIN_NEXUS_AUTH_PLAIN")
-	os.Unsetenv("PLUGIN_AUTH_PLAIN")
-	os.Unsetenv("PLUGIN_NEXUS_AUTH_BASE64")
-	os.Unsetenv("PLUGIN_AUTH_BASE64")
+	// <paranoia>
+	for _, v := range SensitiveEnvs {
+		_ = os.Unsetenv(v)
+	}
+	p.Settings.AuthHttpHeader = ""
 	p.Settings.AuthPlain = ""
+	p.Settings.AuthBase64 = ""
+	// </paranoia>
 
 	err = p.processRawUploads()
 	if err != nil {

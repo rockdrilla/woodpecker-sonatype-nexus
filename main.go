@@ -15,7 +15,10 @@ type Plugin struct {
 	*plugin.Plugin
 	Settings *Settings
 
-	RestUrl     string
+	RestUrl    string
+	AuthHeader string
+	AuthValue  string
+
 	UploadSpecs map[string]UploadSpec
 	Uploads     []UploadRule
 }
