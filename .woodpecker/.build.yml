@@ -1,0 +1,58 @@
+when:
+  event: [ push, tag, cron, manual ]
+
+variables:
+  - &image_registry 'docker.io'
+  - &image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
+  - &version '0.0.1'
+  - &buildah_image 'quay.io/containers/buildah:v1.34.0'
+  - &go_image 'docker.io/library/golang:1.21.7-bookworm'
+  - &base_image 'gcr.io/distroless/static-debian12:debug-nonroot'
+  ## value list depends on base image
+  ## ref: https://github.com/GoogleContainerTools/distroless#debian-12
+  - &target_platforms 'linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x'
+
+## kind of fixup (remove in near future)
+## ref: https://github.com/woodpecker-ci/plugin-git/releases
+clone:
+  git:
+    image: woodpeckerci/plugin-git:2.5.0
+
+## NB: ${variable} expressions are subject to pre-processing.
+## ref: https://woodpecker-ci.org/docs/usage/environment
+
+steps:
+
+  - name: build-all
+    image: *go_image
+    environment:
+      TARGET_PLATFORMS: *target_platforms
+      VERSION: *version
+      ##
+      GOPROXY: 'https://nexus.krd.sh/repository/proxy_go,direct'
+      GOSUMDB: 'sum.golang.org https://nexus.krd.sh/repository/proxy_sum.golang.org'
+      GOPRIVATE: '*.krd.sh'
+      GOMAXPROCS: "2"
+      MALLOC_ARENA_MAX: "4"
+    commands:
+      - .ci/build-all.sh
+
+  - name: image-all
+    image: *buildah_image
+    privileged: true
+    environment:
+      TARGET_PLATFORMS: *target_platforms
+      VERSION: *version
+      BASE_IMAGE: *base_image
+      ##
+      IMAGE_REGISTRY: *image_registry
+      IMAGE_NAME: *image_name
+      BUILDAH_FORMAT: "docker"
+      MALLOC_ARENA_MAX: "4"
+    secrets: [ REGISTRY_AUTH ]
+    commands:
+      - .ci/image-all.sh
+
+## personal tweaks :)
+labels:
+  network: dmz

@@ -1,0 +1,13 @@
+ARG TARGET_PLATFORM
+ARG BASE_IMAGE
+
+FROM --platform=${TARGET_PLATFORM} ${BASE_IMAGE}
+
+ARG PLATFORM_SUFFIX
+COPY /dist/plugin-sonatype-nexus${PLATFORM_SUFFIX} /bin/plugin-sonatype-nexus
+
+ENV GOMAXPROCS=4
+
+CMD [ "/bin/plugin-sonatype-nexus" ]
+
+USER nonroot:nonroot

@@ -1,0 +1,61 @@
+when:
+  event: [ pull_request ]
+
+variables:
+  - &version '0.0.1'
+  - &go_image 'docker.io/library/golang:1.21.7-bookworm'
+
+matrix:
+  ## value list depends on base image
+  ## ref: https://github.com/GoogleContainerTools/distroless#debian-12
+  TARGET_PLATFORM:
+    - linux/amd64
+    - linux/arm
+    - linux/arm64
+    - linux/ppc64le
+    - linux/s390x
+
+## kind of fixup (remove in near future)
+## ref: https://github.com/woodpecker-ci/plugin-git/releases
+clone:
+  git:
+    image: woodpeckerci/plugin-git:2.5.0
+
+## NB: ${variable} expressions are subject to pre-processing.
+## ref: https://woodpecker-ci.org/docs/usage/environment
+
+steps:
+  - name: prepare-env
+    image: *go_image
+    environment:
+      VERSION: *version
+      MALLOC_ARENA_MAX: "4"
+    commands:
+      - |
+        : # setup build env
+        : "$${VERSION:?}"
+        .ci/env.sh
+
+  - name: build
+    image: *go_image
+    environment:
+      GOPROXY: 'https://nexus.krd.sh/repository/proxy_go,direct'
+      GOSUMDB: 'sum.golang.org https://nexus.krd.sh/repository/proxy_sum.golang.org'
+      GOPRIVATE: '*.krd.sh'
+      GOMAXPROCS: "2"
+      MALLOC_ARENA_MAX: "4"
+    commands:
+      - |
+        : # source build env
+        head -n 40 .build_env
+        . ./.build_env
+        : "$${GOOS:?}"
+      - |
+        r=0
+        .ci/build.sh || r=$$?
+        .ci/build-cleanup.sh
+        exit $$r
+
+## personal tweaks :)
+labels:
+  network: airgap

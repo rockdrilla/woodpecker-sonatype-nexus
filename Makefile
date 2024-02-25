@@ -10,7 +10,8 @@ SHELL       :=/bin/sh
 BIN := plugin-sonatype-nexus
 
 OUTDIR ?= .
-OUTBIN := $(OUTDIR)/$(BIN)
+OUTSFX ?=
+OUTBIN ?= $(OUTDIR)/$(BIN)$(OUTSFX)
 
 export GO ?= go
 export CGO_ENABLED ?= 0
@@ -39,6 +40,7 @@ build: $(OUTBIN)
 test_git = git -c log.showsignature=false show -s --format=%H:%ct
 
 $(OUTBIN):
+	@:; \
 	GO_BUILDFLAGS='$(strip $(GO_BUILDFLAGS))' ; \
 	if ! $(test_git) >/dev/null 2>&1 ; then \
 	    echo "!!! git information is asbent !!!" >&2 ; \
@@ -48,7 +50,8 @@ $(OUTBIN):
 	  $${GO_BUILDFLAGS} \
 	  $(if $(strip $(TAGS)),-tags '$(strip $(TAGS))') \
 	  $(if $(strip $(GO_LDFLAGS)),-ldflags '$(strip $(GO_LDFLAGS))') \
-	  $(if $(VERBOSE),-v)
+	  $(if $(VERBOSE),-v) ; \
+	$(GO) version -m $@
 
 dev-build: GO_BUILDFLAGS := -race $(GO_BUILDFLAGS)
 dev-build: CGO_ENABLED := 1
