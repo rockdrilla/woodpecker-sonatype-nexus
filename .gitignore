@@ -1,4 +1,4 @@
-/plugin-sonatype-nexus
+/plugin-sonatype-nexus*
 /.auth.json
 /.build_env
 /dist/

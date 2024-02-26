@@ -96,7 +96,8 @@ func (p *Plugin) parseSettings() error {
 	var ur UploadRule
 
 	ur.Repository = p.Settings.Repository
-	ur.Paths = p.Settings.Paths.Value()
+	ur.Paths = make([]string, len(p.Settings.Paths.Value()))
+	copy(ur.Paths, p.Settings.Paths.Value())
 
 	if ur.Repository == "" {
 		return reportEmptySetting("nexus.repository")

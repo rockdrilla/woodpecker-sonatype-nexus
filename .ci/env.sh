@@ -99,6 +99,7 @@ if [ -n "${CI_COMMIT_TAG}" ] ; then
     tags="${CI_COMMIT_TAG#v}"
 fi
 if [ "${CI_COMMIT_BRANCH}" = "${CI_REPO_DEFAULT_BRANCH}" ] ; then
+    ## TODO: think about "latest" tag: it should be error-prone for "backward tag push"
     tags="${tags} ${VERSION} latest"
     echo "RELMODE=1" >> .build_env
 fi
