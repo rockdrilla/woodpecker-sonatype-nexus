@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/base64"
-	"errors"
 	"net/url"
 	"os"
 	"strings"
@@ -16,52 +15,51 @@ import (
 func (p *Plugin) parseSettings() error {
 	var err error
 
-	p.Settings.RootUrl = strings.TrimSpace(p.Settings.RootUrl)
 	if p.Settings.RootUrl == "" {
-		return errors.New("nexus.url: empty")
+		return reportEmptySetting("nexus.url")
 	}
-	restUrl := strings.TrimSuffix(p.Settings.RootUrl, "/") + "/service/rest/"
-	_, err = url.Parse(restUrl)
+	p.Settings.RootUrl = strings.TrimRight(p.Settings.RootUrl, "/")
+	if p.Settings.RootUrl == "" {
+		return reportMalformedSetting("nexus.url", "only slashes")
+	}
+
+	p.RestUrl = p.Settings.RootUrl + "/service/rest/"
+	_, err = url.Parse(p.RestUrl)
 	if err != nil {
+		log.Error().Msg("unable to construct URL for REST API")
 		return err
 	}
-	p.RestUrl = restUrl
 
 	if (p.Settings.AuthPlain == "") && (p.Settings.AuthBase64 == "") && (p.Settings.AuthHttpHeader == "") {
-		return errors.New("missing 'nexus.auth'/'nexus.auth.*'")
+		log.Error().Msg("missing \"nexus.auth\"/\"nexus.auth.*\"")
+		return &ErrEmpty{}
 	}
 	if p.Settings.AuthHttpHeader != "" {
+		reportSupersedingSetting("nexus.auth.header", "nexus.auth", p.Settings.AuthPlain != "")
+		reportSupersedingSetting("nexus.auth.header", "nexus.auth.base64", p.Settings.AuthBase64 != "")
+
 		if !strings.Contains(p.Settings.AuthHttpHeader, "=") {
-			return errors.New("nexus.auth.header: does not contain '='")
+			return reportMalformedSetting("nexus.auth.header", "does not contain '='")
 		}
 
 		parts := strings.SplitN(p.Settings.AuthHttpHeader, "=", 2)
 		if parts[0] == "" {
-			return errors.New("nexus.auth.header: empty Header")
+			return reportMalformedSetting("nexus.auth.header", "empty Header")
 		}
 		if parts[1] == "" {
-			return errors.New("nexus.auth.header: empty Value")
+			return reportMalformedSetting("nexus.auth.header", "empty Value")
 		}
 		p.AuthHeader = parts[0]
 		p.AuthValue = parts[1]
-
-		if p.Settings.AuthBase64 != "" {
-			log.Info().Msgf("nexus.auth.base64: ignored while 'nexus.auth.header' is in effect")
-		}
-		if p.Settings.AuthPlain != "" {
-			log.Info().Msgf("nexus.auth: ignored while 'nexus.auth.header' is in effect")
-		}
 	} else {
 		// proceed with HTTP Basic auth
 		p.AuthHeader = "Authorization"
 
 		if p.Settings.AuthBase64 != "" {
-			if p.Settings.AuthPlain != "" {
-				log.Info().Msgf("nexus.auth: ignored while 'nexus.auth.base64' is in effect")
-			}
+			reportSupersedingSetting("nexus.auth.base64", "nexus.auth", p.Settings.AuthPlain != "")
 		} else {
 			if !strings.Contains(p.Settings.AuthPlain, ":") {
-				return errors.New("nexus.auth: does not contain ':'")
+				return reportMalformedSetting("nexus.auth", "does not contain ':'")
 			}
 
 			p.Settings.AuthBase64 = base64.StdEncoding.EncodeToString([]byte(p.Settings.AuthPlain))
@@ -81,31 +79,36 @@ func (p *Plugin) parseSettings() error {
 
 	err = p.processRawUploads()
 	if err != nil {
+		_ = reportMalformedSetting("nexus.upload", "parse error")
 		return err
 	}
 
 	if len(p.Uploads) != 0 {
+		reportSupersedingSetting("nexus.upload", "nexus.repository", p.Settings.Repository != "")
+		reportSupersedingSetting("nexus.upload", "nexus.paths", len(p.Settings.Paths.Value()) != 0)
+		reportSupersedingSetting("nexus.upload", "nexus.properties", len(p.Settings.Properties.Value()) != 0)
+
 		return nil
 	}
 
-	// execution goes below only when "nexus.upload" is not set
-	// e.g. semi-interactive mode
+	log.Info().Msg("\"nexus.upload\" is empty - trying to fill it with \"inline\" parameters")
+
 	var ur UploadRule
 
 	ur.Repository = p.Settings.Repository
 	ur.Paths = p.Settings.Paths.Value()
 
 	if ur.Repository == "" {
-		return errors.New("nexus.repository: empty")
+		return reportEmptySetting("nexus.repository")
 	}
 	if len(ur.Paths) == 0 {
-		return errors.New("nexus.paths: empty")
+		return reportEmptySetting("nexus.paths")
 	}
 
 	rawProps := p.Settings.Properties.Value()
 	if len(rawProps) != 0 {
 		if rawProps[0] == "" {
-			return errors.New("nexus.properties: empty")
+			return reportEmptySetting("nexus.properties")
 		}
 		// very naive
 		for i := range rawProps {
@@ -114,7 +117,7 @@ func (p *Plugin) parseSettings() error {
 			}
 			switch rawProps[i][0] {
 			case '{', '[':
-				return errors.New("'nexus.properties' must be plain comma-separated list, not JSON-like object")
+				return reportMalformedSetting("nexus.properties", "must be plain comma-separated list, not JSON-like object")
 			}
 		}
 	}
@@ -141,4 +144,22 @@ func (p *Plugin) parseSettings() error {
 	p.Uploads = append(p.Uploads, ur)
 
 	return nil
+}
+
+func reportEmptySetting(name string) error {
+	log.Error().Msgf("\"%s\" is empty", name)
+	return &ErrEmpty{}
+}
+
+func reportMalformedSetting(name, message string) error {
+	log.Error().Msgf("\"%s\" is malformed: %s", name, message)
+	return &ErrMalformed{}
+}
+
+func reportSupersedingSetting(settingName, supersededName string, condition bool) {
+	if !condition {
+		return
+	}
+
+	log.Info().Msgf("\"%s\": ignored while \"%s\" is in effect", settingName, supersededName)
 }

@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"net/http"
+
+	"github.com/rs/zerolog/log"
 )
 
 type NexusRepo struct {
@@ -18,33 +20,43 @@ type NexusRepo struct {
 }
 
 func (p *Plugin) GetNexusRepo(ctx context.Context, repoName string) (NexusRepo, error) {
-	var empty, repo NexusRepo
-
 	if repoName == "" {
-		return empty, errors.New("\"repoName\" parameter is empty")
+		log.Panic().Msg("empty repository name")
 	}
+
+	var empty NexusRepo
+
 	res, err := p.NexusRequest(ctx, "v1/repositories/"+repoName)
 	if err != nil {
+		log.Error().Msgf("unable to retrieve information for repository %q", repoName)
 		return empty, err
 	}
+
 	defer res.Body.Close()
+	if res.StatusCode == http.StatusNotFound {
+		log.Error().Msgf("repository %q does not exist", repoName)
+		return empty, errors.New("notfound")
+	}
 
 	err = GenericResponseHandler(res)
 	if err != nil {
+		log.Error().Msgf("unable to retrieve information for repository %q", repoName)
 		return empty, err
 	}
 
+	var repo NexusRepo
 	dec := json.NewDecoder(res.Body)
 	err = dec.Decode(&repo)
 	if err != nil {
+		log.Error().Msgf("unable to decode information for repository %q", repoName)
 		return empty, err
 	}
 
-	// basic sanity check
-	if repo.Type == "proxy" {
-		return empty, fmt.Errorf("repository %q is type of %q", repoName, repo.Type)
+	switch repo.Type {
+	case "proxy", "group":
+		log.Error().Msgf("repository %q is type of %q", repoName, repo.Type)
+		return empty, errors.ErrUnsupported
 	}
-	// TODO: is "group" upload allowed?
 
 	return repo, nil
 }

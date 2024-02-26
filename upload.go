@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 type UploadRuleBase struct {
@@ -24,13 +26,13 @@ type UploadRule struct {
 
 func (p *Plugin) processRawUploads() error {
 	var err error
-	var result []UploadRule
 
 	b := []byte(p.Settings.RawUploads)
 
 	var base []UploadRuleBase
 	err = json.Unmarshal(b, &base)
 	if err != nil {
+		log.Error().Msg("unable to parse upload rules")
 		return err
 	}
 	if len(base) == 0 {
@@ -40,39 +42,44 @@ func (p *Plugin) processRawUploads() error {
 	var raw []any
 	err = json.Unmarshal(b, &raw)
 	if err != nil {
+		log.Error().Msg("unable to parse upload rules")
 		return err
 	}
 	if len(raw) == 0 {
 		return nil
 	}
 
+	// just in case
+	b = nil
+
 	if len(raw) != len(base) {
 		// just in case
-		return fmt.Errorf("upload[] deserialization error: array length mismatch: %d != %d", len(base), len(raw))
+		log.Error().Msgf("upload[] deserialization error: array length mismatch: %d != %d", len(base), len(raw))
+		return &ErrMalformed{}
 	}
 
-	result = make([]UploadRule, 0, len(raw))
+	result := make([]UploadRule, 0, len(raw))
 	for i := range raw {
 		if base[i].Repository == "" {
-			return fmt.Errorf("upload[%d]: empty \"repository\"", i)
+			return reportEmptySetting(fmt.Sprintf("upload[%d].repository", i))
 		}
 		if len(base[i].Paths) == 0 {
-			return fmt.Errorf("upload[%d]: empty \"paths\"", i)
+			return reportEmptySetting(fmt.Sprintf("upload[%d].paths", i))
 		}
 
 		for k, patt := range base[i].Paths {
 			_, err = filepath.Glob(patt)
 			if err != nil {
-				return fmt.Errorf("upload[%d].paths[%d]: bad pattern %q: %v", i, k, patt, err)
+				return reportMalformedSetting(fmt.Sprintf("upload[%d].paths[%d]", i, k), fmt.Sprintf("bad pattern %q: %v", patt, err))
 			}
 		}
 
 		rtype := reflect.TypeOf(raw[i])
 		if rtype.Kind() != reflect.Map {
-			return fmt.Errorf("upload[%d]: not a map[string]any", i)
+			return reportMalformedSetting(fmt.Sprintf("upload[%d]", i), fmt.Sprintf("not a map[string]any but %v", rtype.Kind()))
 		}
 		if rtype.Key().Kind() != reflect.String {
-			return fmt.Errorf("upload[%d]: not a map[string]any", i)
+			return reportMalformedSetting(fmt.Sprintf("upload[%d]", i), fmt.Sprintf("not a map[string]any but map[%v]any", rtype.Key().Kind()))
 		}
 
 		m := raw[i].(map[string]any)
@@ -85,16 +92,17 @@ func (p *Plugin) processRawUploads() error {
 		for k := range m {
 			switch strings.ToLower(k) {
 			case "repository", "paths":
-				// already handled by UploadRuleBase
+				log.Info().Msgf("upload[%d]: %q is handled by type %q", i, k, "UploadRuleBase")
 				continue
 			case "asset", "filename":
-				// generated on per-artifact basis
+				log.Info().Msgf("upload[%d]: %q is handled internally on per-artifact basis", i, k)
 				continue
 			}
 
 			rtype = reflect.TypeOf(m[k])
 			switch rtype.Kind() {
-			case reflect.Array,
+			case reflect.Invalid,
+				reflect.Array,
 				reflect.Chan,
 				reflect.Func,
 				reflect.Interface,
@@ -104,7 +112,7 @@ func (p *Plugin) processRawUploads() error {
 				reflect.Struct,
 				reflect.UnsafePointer:
 				//
-				return fmt.Errorf("upload[%d]: %q is type of %q", i, k, rtype.String())
+				return reportMalformedSetting(fmt.Sprintf("upload[%d]", i), fmt.Sprintf("%q is type of %q", k, rtype.String()))
 			}
 			ur.Properties[k] = m[k]
 		}

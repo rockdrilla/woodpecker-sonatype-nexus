@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -26,8 +27,9 @@ func (p *Plugin) Execute(ctx context.Context) error {
 		return err
 	}
 
+	// this is logically unreachable code
 	if len(p.Uploads) == 0 {
-		log.Info().Msg("nothing to upload")
+		log.Warn().Msg("nothing to upload")
 		return nil
 	}
 
@@ -53,7 +55,7 @@ func (p *Plugin) Execute(ctx context.Context) error {
 		if !seen {
 			repo, err = p.GetNexusRepo(ctx, p.Uploads[i].Repository)
 			if err != nil {
-				return fmt.Errorf("upload[%d] encountered error while getting repository information: %v", i, err)
+				return err
 			}
 
 			repos[p.Uploads[i].Repository] = repo
@@ -61,32 +63,39 @@ func (p *Plugin) Execute(ctx context.Context) error {
 
 		spec, seen = p.UploadSpecs[repo.Format]
 		if !seen {
-			return fmt.Errorf("upload[%d] has format which is not known by upload-specs (this shouldn't happen!)", i)
-		}
-
-		del_props := make([]string, 0)
-		for k := range p.Uploads[i].Properties {
-			del := isInternalField(k)
-
-			_, seen = spec.AllFieldNames[k]
-			if !seen {
-				del = true
-			}
-			if !del {
-				continue
-			}
-
-			if seen {
-				log.Info().Msgf("upload[%d]: %q is handled internally", i, k)
+			if p.UploadSpecFallback {
+				log.Error().Msgf("upload[%d] has format which is not known by upload-specs while using fallback upload-specs", i)
 			} else {
-				log.Info().Msgf("upload[%d]: %q is not used in %q spec", i, k, repo.Format)
+				log.Error().Msgf("upload[%d] has format which is not known by upload-specs (this shouldn't happen!)", i)
 			}
-			del_props = append(del_props, k)
+			return errors.ErrUnsupported
 		}
-		for _, k := range del_props {
-			delete(p.Uploads[i].Properties, k)
+
+		if len(spec.AllFieldNames) != 0 {
+			del_props := make([]string, 0)
+			for k := range p.Uploads[i].Properties {
+				del := isInternalField(k)
+
+				_, seen = spec.AllFieldNames[k]
+				if !seen {
+					del = true
+				}
+				if !del {
+					continue
+				}
+
+				del_props = append(del_props, k)
+				if seen {
+					log.Info().Msgf("upload[%d]: %q is handled internally", i, k)
+				} else {
+					log.Info().Msgf("upload[%d]: %q is not used in %q spec", i, k, repo.Format)
+				}
+			}
+			for _, k := range del_props {
+				delete(p.Uploads[i].Properties, k)
+			}
+			del_props = nil
 		}
-		del_props = nil
 
 		for _, cf := range spec.ComponentFields {
 			err = p.verifyUploadField(ctx, i, cf)
@@ -103,27 +112,31 @@ func (p *Plugin) Execute(ctx context.Context) error {
 		}
 	}
 
-	var assets []string
 	for i := range p.Uploads {
 		repo = repos[p.Uploads[i].Repository]
 		spec = p.UploadSpecs[repo.Format]
 
 		// naive capacity assumption
-		assets = make([]string, 0, len(p.Uploads[i].Paths))
+		assets := make([]string, 0, len(p.Uploads[i].Paths))
+		// TODO: use xxhash(path) as key?..
 		seen_paths := make(map[string]bool)
 		for k, patt := range p.Uploads[i].Paths {
 			paths, err := filepath.Glob(patt)
 			if err != nil {
 				// this shouldn't happen
+				log.Error().Msgf("upload[%d].paths[%d]: bad pattern %q", i, k, patt)
 				return err
 			}
+
 			if len(paths) == 0 {
-				log.Info().Msgf("upload[%d].paths[%d]: empty match for %q", i, k, patt)
+				log.Warn().Msgf("upload[%d].paths[%d]: empty match for %q", i, k, patt)
 				continue
 			}
+
 			for _, path := range paths {
 				_, seen := seen_paths[path]
 				if seen {
+					log.Info().Msgf("upload[%d].paths[%d]: already seen %q", i, k, path)
 					continue
 				}
 
@@ -139,10 +152,9 @@ func (p *Plugin) Execute(ctx context.Context) error {
 		seen_paths = nil
 
 		if len(assets) == 0 {
-			return fmt.Errorf("upload[%d].paths[]: empty", i)
 			// TODO: less strict mode?
-			// log.Warn().Msgf("upload[%d]: none of paths have returned matches", i)
-			// continue
+			log.Error().Msgf("upload[%d].paths[]: no elements", i)
+			return &ErrEmpty{}
 		}
 
 		if spec.MultipleUpload {
@@ -152,6 +164,7 @@ func (p *Plugin) Execute(ctx context.Context) error {
 				if s_end > len(assets) {
 					s_end = len(assets)
 				}
+				log.Info().Msgf("upload[%d]: sending %d files at once", i, s_end-s_start+1)
 				err = p.uploadToNexus(ctx, &p.Uploads[i], &repo, &spec, assets[s_start:s_end]...)
 				if err != nil {
 					return err
@@ -167,7 +180,7 @@ func (p *Plugin) Execute(ctx context.Context) error {
 		}
 	}
 
-	log.Debug().Msg("executed")
+	log.Info().Msg("done")
 	return nil
 }
 
@@ -180,30 +193,33 @@ func isInternalField(fieldName string) bool {
 }
 
 func verifyFilePath(filePath, errorPrefix string) error {
-	if errorPrefix == "" {
-		panic(1)
-	}
-
 	if filePath == "" {
-		return fmt.Errorf("%s is empty", errorPrefix)
+		log.Panic().Msg("empty file path")
+	}
+	if errorPrefix == "" {
+		log.Panic().Msg("empty error prefix")
 	}
 
 	fpath, err := filepath.EvalSymlinks(filePath)
 	if err != nil {
-		return fmt.Errorf("%s is required but missing: %q %v", errorPrefix, filePath, err)
+		log.Error().Msgf("%s is required but missing: %q", errorPrefix, filePath)
+		return err
 	}
 
 	if !filepath.IsLocal(fpath) {
-		return fmt.Errorf("%s is pointing outside of current working directory: %q", errorPrefix, filePath)
+		log.Error().Msgf("%s is pointing outside of current working directory: %q", errorPrefix, filePath)
+		return &ErrMalformed{}
 	}
 
 	finfo, err := os.Stat(fpath)
 	if err != nil {
-		return fmt.Errorf("%s is required but missing: %q %v", errorPrefix, filePath, err)
+		log.Error().Msgf("%s is required but missing: %q", errorPrefix, filePath)
+		return err
 	}
 
 	if !finfo.Mode().IsRegular() {
-		return fmt.Errorf("%s is required but not a regular file: %q %v", errorPrefix, filePath, err)
+		log.Error().Msgf("%s is required but not a regular file: %q", errorPrefix, filePath)
+		return &ErrMalformed{}
 	}
 
 	return nil
@@ -221,13 +237,15 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 			return nil
 		}
 
-		return fmt.Errorf("upload[%d]: %q is required but missing", uploadNum, field.Name)
+		log.Error().Msgf("upload[%d]: %q is required but missing", uploadNum, field.Name)
+		return &ErrMissing{}
 	}
 
 	rkind1 := reflect.TypeOf(prop).Kind()
 	rkind2 := field.Type.ToReflectKind()
 	if rkind1 != rkind2 {
-		return fmt.Errorf("upload[%d]: %q has wrong type: %v != %v", uploadNum, field.Name, rkind1, rkind2)
+		log.Error().Msgf("upload[%d]: %q has wrong type: %v != %v", uploadNum, field.Name, rkind1, rkind2)
+		return errors.ErrUnsupported
 	}
 
 	switch field.Type {
@@ -235,10 +253,11 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 		s := prop.(string)
 		if s == "" {
 			if !field.Optional {
-				return fmt.Errorf("upload[%d]: %q is required but empty", uploadNum, field.Name)
+				log.Error().Msgf("upload[%d]: %q is required but empty", uploadNum, field.Name)
+				return &ErrEmpty{}
 			}
 
-			log.Info().Msgf("upload[%d]: %q is set but empty", uploadNum, field.Name)
+			log.Info().Msgf("upload[%d]: %q is set but empty - deleting optional empty field", uploadNum, field.Name)
 			delete(p.Uploads[uploadNum].Properties, field.Name)
 			return nil
 		}
@@ -302,7 +321,7 @@ func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *Ne
 
 			switch strings.ToLower(af.Name) {
 			case "filename":
-				err = w.WriteField(postField, filepath.Base(a))
+				err = writeFormFieldType(w, postField, String, filepath.Base(a))
 				if err != nil {
 					return err
 				}
@@ -323,6 +342,7 @@ func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *Ne
 
 	err = w.Close()
 	if err != nil {
+		log.Error().Msg("HTTP POST: unable to finish request")
 		return err
 	}
 
@@ -339,27 +359,42 @@ func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *Ne
 func writeFormFile(w *multipart.Writer, fieldName string, fileName string) error {
 	data, err := os.ReadFile(fileName)
 	if err != nil {
+		log.Error().Msgf("HTTP POST: unable to read file %q for field %q", fileName, fieldName)
 		return err
 	}
 
 	part, err := w.CreateFormFile(fieldName, filepath.Base(fileName))
 	if err != nil {
+		log.Error().Msgf("HTTP POST: unable to prepare file %q for field %q", fileName, fieldName)
 		return err
 	}
 
 	_, err = part.Write(data)
+	if err != nil {
+		log.Error().Msgf("HTTP POST: unable to write file %q for field %q", fileName, fieldName)
+	}
+
 	return err
 }
 
 func writeFormFieldType(w *multipart.Writer, fieldName string, fieldType UploadFieldType, fieldValue any) error {
+	var err error
+
 	switch fieldType {
 	case File:
-		return writeFormFile(w, fieldName, fieldValue.(string))
+		err = writeFormFile(w, fieldName, fieldValue.(string))
 	case String:
-		return w.WriteField(fieldName, fieldValue.(string))
+		err = w.WriteField(fieldName, fieldValue.(string))
 	case Boolean:
-		return w.WriteField(fieldName, strconv.FormatBool(fieldValue.(bool)))
+		err = w.WriteField(fieldName, strconv.FormatBool(fieldValue.(bool)))
+	default:
+		log.Error().Msgf("HTTP POST: refusing to write %q (of type %q)", fieldName, fieldType.String())
+		return errors.ErrUnsupported
 	}
 
-	return fmt.Errorf("unhandled field type: %v", fieldType)
+	if err != nil {
+		log.Error().Msgf("HTTP POST: unable to write %q (of type %q)", fieldName, fieldType.String())
+	}
+
+	return err
 }

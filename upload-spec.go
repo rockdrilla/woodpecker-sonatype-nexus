@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 type UploadSpec struct {
@@ -31,7 +32,7 @@ type UploadField struct {
 type UploadFieldType uint8
 
 const (
-	Unspecified UploadFieldType = iota
+	Invariant UploadFieldType = iota
 	Invalid
 
 	File
@@ -40,26 +41,26 @@ const (
 )
 
 func (p *Plugin) getUploadSpecs(ctx context.Context) error {
-	var rawspecs []UploadSpec
-
 	res, err := p.NexusRequest(ctx, "v1/formats/upload-specs")
+	if err == nil {
+		defer res.Body.Close()
+		err = GenericResponseHandler(res)
+	}
 	if err != nil {
+		log.Error().Msg("unable to retrieve upload specs")
 		return err
 	}
-	defer res.Body.Close()
 
-	err = GenericResponseHandler(res)
-	if err != nil {
-		return err
-	}
-
+	var rawspecs []UploadSpec
 	dec := json.NewDecoder(res.Body)
 	err = dec.Decode(&rawspecs)
 	if err != nil {
+		log.Error().Msg("unable to decode information for upload specs")
 		return err
 	}
 	if len(rawspecs) == 0 {
-		return errors.New("no upload specs were acquired from Sonatype Nexus")
+		log.Error().Msg("empty upload specs")
+		return &ErrEmpty{}
 	}
 
 	p.UploadSpecs = make(map[string]UploadSpec)
@@ -88,27 +89,33 @@ func (p *Plugin) getUploadSpecs(ctx context.Context) error {
 }
 
 var (
-	UploadFieldType_to_str map[UploadFieldType]string = map[UploadFieldType]string{
+	uploadFieldType_to_str map[UploadFieldType]string = map[UploadFieldType]string{
+		Invariant: "",
+		Invalid:   "INVALID",
+
 		File:    "file",
 		String:  "string",
 		Boolean: "boolean",
 	}
 
-	UploadFieldType_to_reflect map[UploadFieldType]reflect.Kind = map[UploadFieldType]reflect.Kind{
+	uploadFieldType_to_reflect map[UploadFieldType]reflect.Kind = map[UploadFieldType]reflect.Kind{
+		Invariant: reflect.Invalid,
+		Invalid:   reflect.Invalid,
+
 		File:    reflect.String,
 		String:  reflect.String,
 		Boolean: reflect.Bool,
 	}
 
-	UploadFieldType_from_str map[string]UploadFieldType = map[string]UploadFieldType{
+	uploadFieldType_from_str map[string]UploadFieldType = map[string]UploadFieldType{
 		"file":    File,
 		"string":  String,
 		"boolean": Boolean,
 	}
 )
 
-func (x UploadFieldType) IsUnspecified() bool {
-	return x == Unspecified
+func (x UploadFieldType) IsInvariant() bool {
+	return x == Invariant
 }
 
 func (x UploadFieldType) IsValid() bool {
@@ -120,15 +127,15 @@ func (x UploadFieldType) IsValid() bool {
 }
 
 func (x UploadFieldType) String() string {
-	s, ok := UploadFieldType_to_str[x]
+	s, ok := uploadFieldType_to_str[x]
 	if ok {
 		return s
 	}
-	return "UNSPECIFIED"
+	return "INVARIANT"
 }
 
 func (x UploadFieldType) ToReflectKind() reflect.Kind {
-	t, ok := UploadFieldType_to_reflect[x]
+	t, ok := uploadFieldType_to_reflect[x]
 	if ok {
 		return t
 	}
@@ -136,11 +143,11 @@ func (x UploadFieldType) ToReflectKind() reflect.Kind {
 }
 
 func StringToUploadFieldType(s string) UploadFieldType {
-	// if s == "" {
-	// 	return Unspecified
-	// }
+	if s == "" {
+		return Invariant
+	}
 
-	x, ok := UploadFieldType_from_str[strings.ToLower(s)]
+	x, ok := uploadFieldType_from_str[strings.ToLower(s)]
 	if ok {
 		return x
 	}
@@ -150,13 +157,14 @@ func StringToUploadFieldType(s string) UploadFieldType {
 func (x *UploadFieldType) UnmarshalJSON(b []byte) error {
 	s := string(b)
 	t := StringToUploadFieldType(s)
-	if !t.IsUnspecified() {
+	if !t.IsInvariant() {
 		if t.IsValid() {
 			*x = t
 			return nil
 		}
 
-		return fmt.Errorf("incorrect type: %q", s)
+		log.Error().Msgf("not supported UploadFieldType: %q", s)
+		return errors.ErrUnsupported
 	}
 	return nil
 }

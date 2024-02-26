@@ -37,7 +37,7 @@ func (p *Plugin) Flags() []cli.Flag {
 			Usage:       "Sonatype Nexus URL (e.g. \"https://nexus.domain.com\")",
 			EnvVars:     []string{"PLUGIN_NEXUS_URL", "NEXUS_URL"},
 			Destination: &p.Settings.RootUrl,
-			Required:    true,
+			// avoid setting "Required" to "true" in order to achieve much shorter output
 		},
 
 		// https://help.sonatype.com/en/user-tokens.html#use-user-token-for-repository-authentication
