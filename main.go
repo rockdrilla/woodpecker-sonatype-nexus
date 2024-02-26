@@ -19,8 +19,10 @@ type Plugin struct {
 	AuthHeader string
 	AuthValue  string
 
-	UploadSpecs map[string]UploadSpec
-	Uploads     []UploadRule
+	UploadSpecs        map[string]UploadSpec
+	UploadSpecFallback bool
+
+	Uploads []UploadRule
 }
 
 func main() {

@@ -46,25 +46,51 @@ func (p *Plugin) getUploadSpecs(ctx context.Context) error {
 		defer res.Body.Close()
 		err = GenericResponseHandler(res)
 	}
-	if err != nil {
-		log.Error().Msg("unable to retrieve upload specs")
-		return err
+
+	for {
+		if err != nil {
+			p.UploadSpecFallback = true
+			log.Error().Msg("unable to retrieve upload-specs")
+			break
+		}
+
+		var rawspecs []UploadSpec
+		dec := json.NewDecoder(res.Body)
+		err = dec.Decode(&rawspecs)
+		if err != nil {
+			p.UploadSpecFallback = true
+			log.Error().Msg("unable to decode information for upload-specs")
+			break
+		}
+
+		if len(rawspecs) == 0 {
+			p.UploadSpecFallback = true
+			log.Error().Msg("empty upload-specs")
+			break
+		}
+
+		p.UploadSpecs = make(map[string]UploadSpec)
+		for _, s := range rawspecs {
+			p.UploadSpecs[s.Format] = s
+		}
+		//lint:ignore SA4004 this is correct
+		break
 	}
 
-	var rawspecs []UploadSpec
-	dec := json.NewDecoder(res.Body)
-	err = dec.Decode(&rawspecs)
-	if err != nil {
-		log.Error().Msg("unable to decode information for upload specs")
-		return err
-	}
-	if len(rawspecs) == 0 {
-		log.Error().Msg("empty upload specs")
-		return &ErrEmpty{}
+	if p.UploadSpecFallback {
+		log.Warn().Msg("using fallback upload-specs")
+		prepareFallbackUploadSpec()
+		p.UploadSpecs = fallbackUploadSpec
 	}
 
-	p.UploadSpecs = make(map[string]UploadSpec)
-	for _, s := range rawspecs {
+	keys := make([]string, 0, len(p.UploadSpecs))
+	for k := range p.UploadSpecs {
+		keys = append(keys, k)
+	}
+
+	// refill UploadSpecs
+	for _, k := range keys {
+		s := p.UploadSpecs[k]
 		s.AllFieldNames = make(map[string]bool)
 		var seen bool
 		for _, f := range s.ComponentFields {
@@ -82,7 +108,7 @@ func (p *Plugin) getUploadSpecs(ctx context.Context) error {
 			s.AllFieldNames[f.Name] = true
 		}
 
-		p.UploadSpecs[s.Format] = s
+		p.UploadSpecs[k] = s
 	}
 
 	return nil
