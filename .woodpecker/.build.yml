@@ -1,10 +1,10 @@
 when:
-  event: [ push, tag, cron, manual ]
+  event: [ push, cron, manual ]
 
 variables:
   - &image_registry 'docker.io'
   - &image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
-  - &version '0.0.2'
+  - &version '0.0.3'
   - &buildah_image 'quay.io/containers/buildah:v1.34.0'
   - &go_image 'docker.io/library/golang:1.21.7-bookworm'
   - &base_image 'gcr.io/distroless/static-debian12:debug-nonroot'
