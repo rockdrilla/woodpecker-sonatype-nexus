@@ -62,7 +62,7 @@ func (p *Plugin) NexusRequestEx(ctx context.Context, requestMethod string, reque
 	switch res.StatusCode {
 	case http.StatusUnauthorized:
 		defer res.Body.Close()
-		log.Error().Msgf("authorization is declined for HTTP %s %q", requestMethod, "/"+requestUrl)
+		log.Error().Msgf("authentication is declined for HTTP %s %q", requestMethod, "/"+requestUrl)
 		return nil, errors.New("unauthorized")
 	case http.StatusForbidden:
 		defer res.Body.Close()

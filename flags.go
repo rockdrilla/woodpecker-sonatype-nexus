@@ -43,19 +43,19 @@ func (p *Plugin) Flags() []cli.Flag {
 		// https://help.sonatype.com/en/user-tokens.html#use-user-token-for-repository-authentication
 		&cli.StringFlag{
 			Name:        "nexus.auth",
-			Usage:       "Sonatype Nexus - HTTP Basic authorization (plain-text, either {username}:{password} or {token name}:{token pass})",
+			Usage:       "Sonatype Nexus - HTTP Basic Authentication (plain-text, either {username}:{password} or {token name}:{token pass})",
 			EnvVars:     []string{"PLUGIN_NEXUS_AUTH", "PLUGIN_AUTH", "NEXUS_AUTH"},
 			Destination: &p.Settings.AuthPlain,
 		},
 		&cli.StringFlag{
 			Name:        "nexus.auth.base64",
-			Usage:       "Sonatype Nexus - HTTP Basic authorization (base64-encoded, preferred)",
+			Usage:       "Sonatype Nexus - HTTP Basic Authentication (base64-encoded, preferred)",
 			EnvVars:     []string{"PLUGIN_NEXUS_AUTH_BASE64", "PLUGIN_AUTH_BASE64", "NEXUS_AUTH_BASE64"},
 			Destination: &p.Settings.AuthBase64,
 		},
 		&cli.StringFlag{
 			Name:        "nexus.auth.header",
-			Usage:       "Sonatype Nexus - generic HTTP authorization header (in form {Header}={Value})",
+			Usage:       "Sonatype Nexus - generic HTTP authentication header (in form {Header}={Value})",
 			EnvVars:     []string{"PLUGIN_NEXUS_AUTH_HEADER", "PLUGIN_AUTH_HEADER", "NEXUS_AUTH_HEADER"},
 			Destination: &p.Settings.AuthHttpHeader,
 		},
