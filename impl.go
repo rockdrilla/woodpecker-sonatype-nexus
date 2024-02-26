@@ -64,15 +64,29 @@ func (p *Plugin) Execute(ctx context.Context) error {
 			return fmt.Errorf("upload[%d] has format which is not known by upload-specs (this shouldn't happen!)", i)
 		}
 
+		del_props := make([]string, 0)
 		for k := range p.Uploads[i].Properties {
+			del := isInternalField(k)
+
 			_, seen = spec.AllFieldNames[k]
-			if seen {
+			if !seen {
+				del = true
+			}
+			if !del {
 				continue
 			}
 
-			log.Info().Msgf("upload[%d]: %q is not used in %q spec", i, k, repo.Format)
+			if seen {
+				log.Info().Msgf("upload[%d]: %q is handled internally", i, k)
+			} else {
+				log.Info().Msgf("upload[%d]: %q is not used in %q spec", i, k, repo.Format)
+			}
+			del_props = append(del_props, k)
+		}
+		for _, k := range del_props {
 			delete(p.Uploads[i].Properties, k)
 		}
+		del_props = nil
 
 		for _, cf := range spec.ComponentFields {
 			err = p.verifyUploadField(ctx, i, cf)
@@ -140,16 +154,23 @@ func (p *Plugin) Execute(ctx context.Context) error {
 	return nil
 }
 
+func isInternalField(fieldName string) bool {
+	switch strings.ToLower(fieldName) {
+	case "asset", "filename":
+		return true
+	}
+	return false
+}
+
 func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field UploadField) error {
+	if isInternalField(field.Name) {
+		// generated on per-artifact basis
+		return nil
+	}
+
 	prop, seen := p.Uploads[uploadNum].Properties[field.Name]
 	if !seen {
 		if field.Optional {
-			return nil
-		}
-
-		switch strings.ToLower(field.Name) {
-		case "asset", "filename":
-			// generated on per-artifact basis
 			return nil
 		}
 
