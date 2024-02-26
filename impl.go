@@ -110,22 +110,39 @@ func (p *Plugin) Execute(ctx context.Context) error {
 
 		// naive capacity assumption
 		assets = make([]string, 0, len(p.Uploads[i].Paths))
+		seen_paths := make(map[string]bool)
 		for k, patt := range p.Uploads[i].Paths {
-			g, err := filepath.Glob(patt)
+			paths, err := filepath.Glob(patt)
 			if err != nil {
 				// this shouldn't happen
 				return err
 			}
-			if len(g) == 0 {
+			if len(paths) == 0 {
 				log.Info().Msgf("upload[%d].paths[%d]: empty match for %q", i, k, patt)
 				continue
 			}
-			assets = append(assets, g...)
+			for _, path := range paths {
+				_, seen := seen_paths[path]
+				if seen {
+					continue
+				}
+
+				err = verifyFilePath(path, fmt.Sprintf("upload[%d].paths[%d]:", i, k))
+				if err != nil {
+					return err
+				}
+
+				seen_paths[path] = true
+				assets = append(assets, path)
+			}
 		}
+		seen_paths = nil
 
 		if len(assets) == 0 {
-			log.Warn().Msgf("upload[%d]: none of paths have returned matches", i)
-			continue
+			return fmt.Errorf("upload[%d].paths[]: empty", i)
+			// TODO: less strict mode?
+			// log.Warn().Msgf("upload[%d]: none of paths have returned matches", i)
+			// continue
 		}
 
 		if spec.MultipleUpload {
@@ -160,6 +177,36 @@ func isInternalField(fieldName string) bool {
 		return true
 	}
 	return false
+}
+
+func verifyFilePath(filePath, errorPrefix string) error {
+	if errorPrefix == "" {
+		panic(1)
+	}
+
+	if filePath == "" {
+		return fmt.Errorf("%s is empty", errorPrefix)
+	}
+
+	fpath, err := filepath.EvalSymlinks(filePath)
+	if err != nil {
+		return fmt.Errorf("%s is required but missing: %q %v", errorPrefix, filePath, err)
+	}
+
+	if !filepath.IsLocal(fpath) {
+		return fmt.Errorf("%s is pointing outside of current working directory: %q", errorPrefix, filePath)
+	}
+
+	finfo, err := os.Stat(fpath)
+	if err != nil {
+		return fmt.Errorf("%s is required but missing: %q %v", errorPrefix, filePath, err)
+	}
+
+	if !finfo.Mode().IsRegular() {
+		return fmt.Errorf("%s is required but not a regular file: %q %v", errorPrefix, filePath, err)
+	}
+
+	return nil
 }
 
 func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field UploadField) error {
@@ -201,18 +248,9 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 			return nil
 		}
 
-		fpath, err := filepath.EvalSymlinks(s)
+		err := verifyFilePath(s, fmt.Sprintf("upload[%d]: file %q", uploadNum, field.Name))
 		if err != nil {
-			return fmt.Errorf("upload[%d]: file %q is required but missing: %q %v", uploadNum, field.Name, s, err)
-		}
-
-		finfo, err := os.Stat(fpath)
-		if err != nil {
-			return fmt.Errorf("upload[%d]: file %q is required but missing: %q %v", uploadNum, field.Name, s, err)
-		}
-
-		if !finfo.Mode().IsRegular() {
-			return fmt.Errorf("upload[%d]: file %q is required but not a regular file: %q %v", uploadNum, field.Name, s, err)
+			return err
 		}
 	}
 
