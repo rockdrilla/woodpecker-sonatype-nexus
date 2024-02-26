@@ -103,20 +103,19 @@ func (p *Plugin) parseSettings() error {
 	}
 
 	rawProps := p.Settings.Properties.Value()
-	if len(rawProps) == 0 {
-		return errors.New("nexus.properties: empty")
-	}
-	if rawProps[0] == "" {
-		return errors.New("nexus.properties: empty")
-	}
-	// very naive
-	for i := range rawProps {
-		if rawProps[i] == "" {
-			continue
+	if len(rawProps) != 0 {
+		if rawProps[0] == "" {
+			return errors.New("nexus.properties: empty")
 		}
-		switch rawProps[i][0] {
-		case '{', '[':
-			return errors.New("'nexus.properties' must be plain comma-separated list, not JSON-like object")
+		// very naive
+		for i := range rawProps {
+			if rawProps[i] == "" {
+				continue
+			}
+			switch rawProps[i][0] {
+			case '{', '[':
+				return errors.New("'nexus.properties' must be plain comma-separated list, not JSON-like object")
+			}
 		}
 	}
 
