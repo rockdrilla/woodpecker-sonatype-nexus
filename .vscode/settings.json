@@ -1,0 +1,6 @@
+{
+  "yaml.schemas": {
+    "https://github.com/woodpecker-ci/woodpecker/raw/main/pipeline/frontend/yaml/linter/schema/schema.json":
+    ".woodpecker/.*.yml"
+  }
+}
