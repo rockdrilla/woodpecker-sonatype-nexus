@@ -18,7 +18,7 @@ func (p *Plugin) parseSettings() error {
 
 	p.Settings.RootUrl = strings.TrimSpace(p.Settings.RootUrl)
 	if p.Settings.RootUrl == "" {
-		return errors.New("empty nexus.url")
+		return errors.New("nexus.url: empty")
 	}
 	restUrl := strings.TrimSuffix(p.Settings.RootUrl, "/") + "/service/rest/"
 	_, err = url.Parse(restUrl)
@@ -28,11 +28,11 @@ func (p *Plugin) parseSettings() error {
 	p.RestUrl = restUrl
 
 	if (p.Settings.AuthPlain == "") && (p.Settings.AuthBase64 == "") && (p.Settings.AuthHttpHeader == "") {
-		return errors.New("missing nexus.auth/nexus.auth.*")
+		return errors.New("missing 'nexus.auth'/'nexus.auth.*'")
 	}
 	if p.Settings.AuthHttpHeader != "" {
 		if !strings.Contains(p.Settings.AuthHttpHeader, "=") {
-			return errors.New("nexus.auth.header does not contain '='")
+			return errors.New("nexus.auth.header: does not contain '='")
 		}
 
 		parts := strings.SplitN(p.Settings.AuthHttpHeader, "=", 2)
@@ -46,10 +46,10 @@ func (p *Plugin) parseSettings() error {
 		p.AuthValue = parts[1]
 
 		if p.Settings.AuthBase64 != "" {
-			log.Info().Msgf("'nexus.auth.base64' is ignored while 'nexus.auth.header' is in effect")
+			log.Info().Msgf("nexus.auth.base64: ignored while 'nexus.auth.header' is in effect")
 		}
 		if p.Settings.AuthPlain != "" {
-			log.Info().Msgf("'nexus.auth' is ignored while 'nexus.auth.header' is in effect")
+			log.Info().Msgf("nexus.auth: ignored while 'nexus.auth.header' is in effect")
 		}
 	} else {
 		// proceed with HTTP Basic auth
@@ -57,11 +57,11 @@ func (p *Plugin) parseSettings() error {
 
 		if p.Settings.AuthBase64 != "" {
 			if p.Settings.AuthPlain != "" {
-				log.Info().Msgf("'nexus.auth' is ignored while 'nexus.auth.base64' is in effect")
+				log.Info().Msgf("nexus.auth: ignored while 'nexus.auth.base64' is in effect")
 			}
 		} else {
 			if !strings.Contains(p.Settings.AuthPlain, ":") {
-				return errors.New("nexus.auth does not contain ':'")
+				return errors.New("nexus.auth: does not contain ':'")
 			}
 
 			p.Settings.AuthBase64 = base64.StdEncoding.EncodeToString([]byte(p.Settings.AuthPlain))
@@ -88,30 +88,53 @@ func (p *Plugin) parseSettings() error {
 		return nil
 	}
 
-	// semi-interactive mode
+	// execution goes below only when "nexus.upload" is not set
+	// e.g. semi-interactive mode
 	var ur UploadRule
 
 	ur.Repository = p.Settings.Repository
 	ur.Paths = p.Settings.Paths.Value()
 
 	if ur.Repository == "" {
-		return errors.New("empty nexus.repository")
+		return errors.New("nexus.repository: empty")
 	}
 	if len(ur.Paths) == 0 {
-		return errors.New("empty nexus.paths")
+		return errors.New("nexus.paths: empty")
+	}
+
+	rawProps := p.Settings.Properties.Value()
+	if len(rawProps) == 0 {
+		return errors.New("nexus.properties: empty")
+	}
+	if rawProps[0] == "" {
+		return errors.New("nexus.properties: empty")
+	}
+	// very naive
+	for i := range rawProps {
+		if rawProps[i] == "" {
+			continue
+		}
+		switch rawProps[i][0] {
+		case '{', '[':
+			return errors.New("'nexus.properties' must be plain comma-separated list, not JSON-like object")
+		}
 	}
 
 	ur.Properties = make(map[string]any)
-	for i, s := range p.Settings.Properties.Value() {
-		if !strings.Contains(s, "=") {
-			log.Warn().Msgf("cli.property[%d]: value does not contain '='", i)
+	for i := range rawProps {
+		if rawProps[i] == "" {
+			log.Warn().Msgf("nexus.properties[%d]: empty part", i)
+			continue
+		}
+		if !strings.Contains(rawProps[i], "=") {
+			log.Warn().Msgf("nexus.properties[%d]: value does not contain '='", i)
 			continue
 		}
 
-		parts := strings.SplitN(s, "=", 2)
+		parts := strings.SplitN(rawProps[i], "=", 2)
 		_, seen := ur.Properties[parts[0]]
 		if seen {
-			log.Warn().Msgf("cli.property[%d]: overriding previous value of %q", i, parts[0])
+			log.Warn().Msgf("nexus.properties[%d]: overriding previous value of %q", i, parts[0])
 		}
 		ur.Properties[parts[0]] = parts[1]
 	}

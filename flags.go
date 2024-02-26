@@ -16,7 +16,7 @@ type Settings struct {
 
 	RawUploads string
 
-	// semi-interactive mode
+	// used only when "nexus.upload" is not set
 	Repository string
 	Paths      cli.StringSlice
 	Properties cli.StringSlice
@@ -68,7 +68,7 @@ func (p *Plugin) Flags() []cli.Flag {
 			Value:       "[]",
 		},
 
-		// semi-interactive mode
+		// used only when "nexus.upload" is not set
 		&cli.StringFlag{
 			Name:        "nexus.repository",
 			Usage:       "Repository name",
