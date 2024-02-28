@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+	"github.com/urfave/cli/v2"
 )
 
 func (p *Plugin) parseSettings() error {
@@ -69,8 +70,14 @@ func (p *Plugin) parseSettings() error {
 	}
 
 	// <paranoia>
-	for _, v := range SensitiveEnvs {
-		_ = os.Unsetenv(v)
+	for i := range p.Settings.flags {
+		f, ok := p.Settings.flags[i].(cli.DocGenerationFlag)
+		if !ok {
+			continue
+		}
+		for _, v := range f.GetEnvVars() {
+			_ = os.Unsetenv(v)
+		}
 	}
 	p.Settings.AuthHttpHeader = ""
 	p.Settings.AuthPlain = ""

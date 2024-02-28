@@ -8,6 +8,8 @@ import (
 )
 
 type Settings struct {
+	flags []cli.Flag
+
 	RootUrl string
 
 	AuthPlain      string
@@ -22,16 +24,15 @@ type Settings struct {
 	Properties cli.StringSlice
 }
 
-var (
-	SensitiveEnvs []string = []string{
-		"PLUGIN_NEXUS_AUTH", "PLUGIN_AUTH", "NEXUS_AUTH",
-		"PLUGIN_NEXUS_AUTH_BASE64", "PLUGIN_AUTH_BASE64", "NEXUS_AUTH_BASE64",
-		"PLUGIN_NEXUS_AUTH_HEADER", "PLUGIN_AUTH_HEADER", "NEXUS_AUTH_HEADER",
-	}
-)
-
 func (p *Plugin) Flags() []cli.Flag {
-	return []cli.Flag{
+	if len(p.Settings.flags) == 0 {
+		p.flags()
+	}
+	return p.Settings.flags
+}
+
+func (p *Plugin) flags() {
+	p.Settings.flags = []cli.Flag{
 		&cli.StringFlag{
 			Name:        "nexus.url",
 			Usage:       "Sonatype Nexus URL (e.g. \"https://nexus.domain.com\")",
