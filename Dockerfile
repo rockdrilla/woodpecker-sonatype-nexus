@@ -29,10 +29,10 @@ RUN go env | grep -F -e GOPROXY -e GOSUMDB -e GOPRIVATE ; \
 
 FROM ${BASE_IMAGE}
 
-COPY --from=build /go/bin/plugin-sonatype-nexus /bin/
+COPY --from=build /go/bin/publish-nexus /bin/
 
 ENV GOMAXPROCS=4
 
-CMD [ "/bin/plugin-sonatype-nexus" ]
+CMD [ "/bin/publish-nexus" ]
 
 USER nonroot:nonroot

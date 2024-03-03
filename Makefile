@@ -7,7 +7,7 @@ SHELL       :=/bin/sh
 
 .NOTPARALLEL:
 
-BIN := plugin-sonatype-nexus
+BIN := publish-nexus
 
 OUTDIR ?= .
 OUTSFX ?=

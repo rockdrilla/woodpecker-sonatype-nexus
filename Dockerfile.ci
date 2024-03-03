@@ -4,10 +4,10 @@ ARG BASE_IMAGE
 FROM --platform=${TARGET_PLATFORM} ${BASE_IMAGE}
 
 ARG PLATFORM_SUFFIX
-COPY /dist/plugin-sonatype-nexus${PLATFORM_SUFFIX} /bin/plugin-sonatype-nexus
+COPY /dist/publish-nexus${PLATFORM_SUFFIX} /bin/publish-nexus
 
 ENV GOMAXPROCS=4
 
-CMD [ "/bin/plugin-sonatype-nexus" ]
+CMD [ "/bin/publish-nexus" ]
 
 USER nonroot:nonroot

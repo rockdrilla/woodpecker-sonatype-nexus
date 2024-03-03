@@ -54,7 +54,7 @@ Example manual invocation (within `rockdrilla/woodpecker-sonatype-nexus` contain
 
 ```sh
 # publish R
-plugin-sonatype-nexus \
+publish-nexus \
   --nexus.url          https://nexus.domain.com \
   --nexus.auth        'upload-user:super-$ecret-passw0rd' \
   --nexus.repository   project-r \
