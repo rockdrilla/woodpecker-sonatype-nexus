@@ -17,6 +17,10 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
+
+	uspec "git.krd.sh/krd/woodpecker-sonatype-nexus/nexus/upload_spec"
+	f "git.krd.sh/krd/woodpecker-sonatype-nexus/nexus/upload_spec/field"
+	ftype "git.krd.sh/krd/woodpecker-sonatype-nexus/nexus/upload_spec/field_type"
 )
 
 func (p *Plugin) Execute(ctx context.Context) error {
@@ -47,7 +51,7 @@ func (p *Plugin) Execute(ctx context.Context) error {
 	var seen bool
 
 	var repo NexusRepo
-	var spec UploadSpec
+	var spec uspec.UploadSpec
 
 	// validation
 	for i := range p.Uploads {
@@ -225,7 +229,7 @@ func verifyFilePath(filePath, errorPrefix string) error {
 	return nil
 }
 
-func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field UploadField) error {
+func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field f.UploadField) error {
 	if isInternalField(field.Name) {
 		// generated on per-artifact basis
 		return nil
@@ -249,7 +253,7 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 	}
 
 	switch field.Type {
-	case String, File:
+	case ftype.String, ftype.File:
 		s := prop.(string)
 		if s == "" {
 			if !field.Optional {
@@ -262,7 +266,7 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 			return nil
 		}
 
-		if field.Type == String {
+		if field.Type == ftype.String {
 			// done with String
 			return nil
 		}
@@ -276,7 +280,7 @@ func (p *Plugin) verifyUploadField(ctx context.Context, uploadNum int, field Upl
 	return nil
 }
 
-func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *NexusRepo, spec *UploadSpec, assets ...string) error {
+func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *NexusRepo, spec *uspec.UploadSpec, assets ...string) error {
 	var err error
 
 	buf := new(bytes.Buffer)
@@ -321,7 +325,7 @@ func (p *Plugin) uploadToNexus(ctx context.Context, upload *UploadRule, repo *Ne
 
 			switch strings.ToLower(af.Name) {
 			case "filename":
-				err = writeFormFieldType(w, postField, String, filepath.Base(a))
+				err = writeFormFieldType(w, postField, ftype.String, filepath.Base(a))
 				if err != nil {
 					return err
 				}
@@ -377,15 +381,15 @@ func writeFormFile(w *multipart.Writer, fieldName string, fileName string) error
 	return err
 }
 
-func writeFormFieldType(w *multipart.Writer, fieldName string, fieldType UploadFieldType, fieldValue any) error {
+func writeFormFieldType(w *multipart.Writer, fieldName string, fieldType ftype.UploadFieldType, fieldValue any) error {
 	var err error
 
 	switch fieldType {
-	case File:
+	case ftype.File:
 		err = writeFormFile(w, fieldName, fieldValue.(string))
-	case String:
+	case ftype.String:
 		err = w.WriteField(fieldName, fieldValue.(string))
-	case Boolean:
+	case ftype.Boolean:
 		err = w.WriteField(fieldName, strconv.FormatBool(fieldValue.(bool)))
 	default:
 		log.Error().Msgf("HTTP POST: refusing to write %q (of type %q)", fieldName, fieldType.String())

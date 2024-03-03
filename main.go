@@ -5,6 +5,8 @@ package main
 
 import (
 	"codeberg.org/woodpecker-plugins/go-plugin"
+
+	uspec "git.krd.sh/krd/woodpecker-sonatype-nexus/nexus/upload_spec"
 )
 
 const (
@@ -19,7 +21,7 @@ type Plugin struct {
 	AuthHeader string
 	AuthValue  string
 
-	UploadSpecs        map[string]UploadSpec
+	UploadSpecs        map[string]uspec.UploadSpec
 	UploadSpecFallback bool
 
 	Uploads []UploadRule
