@@ -1,4 +1,4 @@
-ARG GO_IMAGE=docker.io/library/golang:1.21.7-bookworm
+ARG GO_IMAGE=docker.io/library/golang:1.22.1-bookworm
 ARG BASE_IMAGE=gcr.io/distroless/static-debian12:debug-nonroot
 
 ## ---

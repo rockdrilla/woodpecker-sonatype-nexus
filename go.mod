@@ -3,7 +3,7 @@
 
 module git.krd.sh/krd/woodpecker-sonatype-nexus
 
-go 1.21
+go 1.22
 
 require (
 	codeberg.org/woodpecker-plugins/go-plugin v0.3.1
