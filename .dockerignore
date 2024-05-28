@@ -1,3 +1,7 @@
 .vscode/*
 publish-nexus*
 *.md
+.ci/*
+.woodpecker/*
+.woodpecker.yml
+dist/*

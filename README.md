@@ -1,5 +1,6 @@
 # plugin-sonatype-nexus
 
+[![build-status](https://ci.krd.sh/api/badges/5/status.svg)](https://ci.krd.sh/repos/5)
 [![goreport](https://goreportcard.com/badge/git.krd.sh/krd/woodpecker-sonatype-nexus)](https://goreportcard.com/report/git.krd.sh/krd/woodpecker-sonatype-nexus)
 [![docker-pulls](https://img.shields.io/docker/pulls/rockdrilla/woodpecker-sonatype-nexus)](https://hub.docker.com/r/rockdrilla/woodpecker-sonatype-nexus)
 [![license](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)

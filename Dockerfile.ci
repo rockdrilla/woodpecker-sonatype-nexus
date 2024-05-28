@@ -1,0 +1,15 @@
+ARG TARGET_PLATFORM
+ARG BASE_IMAGE
+
+FROM --platform=${TARGET_PLATFORM} ${BASE_IMAGE}
+
+ARG PLATFORM_SUFFIX
+COPY /dist/publish-nexus${PLATFORM_SUFFIX} /bin/publish-nexus
+
+ENV GOMAXPROCS=4 \
+    MALLOC_ARENA_MAX=4
+
+ENTRYPOINT [ ]
+CMD [ "/bin/publish-nexus" ]
+
+USER nonroot:nonroot

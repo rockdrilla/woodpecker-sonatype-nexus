@@ -1,1 +1,3 @@
 /publish-nexus*
+/.ci/.auth.json
+/dist/

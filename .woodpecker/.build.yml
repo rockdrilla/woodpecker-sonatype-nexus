@@ -1,0 +1,74 @@
+when:
+  event: [ push, tag, cron, manual ]
+
+variables:
+  - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
+  - &ext_image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
+  - &buildah_image 'quay.krd.sh/quay_io/containers/buildah:v1.35.3'
+  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.0'
+  - &go_image 'quay.krd.sh/golang:1.22.3-bookworm'
+  - &base_image 'quay.krd.sh/gcr_io/distroless/static-debian12:debug-nonroot'
+  ## value list depends on base image
+  ## ref: https://github.com/GoogleContainerTools/distroless#debian-12
+  - &target_platforms 'linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x'
+
+## kind of fixup (remove in near future)
+## ref: https://github.com/woodpecker-ci/plugin-git/releases
+clone:
+  git:
+    image: quay.krd.sh/docker_io/woodpeckerci/plugin-git:2.5.0
+
+## NB: ${variable} expressions are subject to pre-processing.
+## ref: https://woodpecker-ci.org/docs/usage/environment
+
+steps:
+
+  - name: verify-registry-credentials
+    image: *skopeo_image
+    environment:
+      GOMAXPROCS: "4"
+      MALLOC_ARENA_MAX: "4"
+    secrets: [ REGISTRY_AUTH ]
+    commands:
+      - .ci/registry-login.sh quay.krd.sh docker.io
+
+  - name: build-all
+    image: *go_image
+    environment:
+      GOMAXPROCS: "4"
+      MALLOC_ARENA_MAX: "4"
+      ##
+      TARGET_PLATFORMS: *target_platforms
+    ## these secrets are server-wide
+    secrets: [ GOPRIVATE, GOPROXY, GOSUMDB ]
+    commands:
+      - .ci/build-all.sh
+
+  - name: image-all
+    image: *buildah_image
+    privileged: true
+    environment:
+      GOMAXPROCS: "4"
+      MALLOC_ARENA_MAX: "4"
+      ##
+      BUILDAH_FORMAT: "docker"
+      TARGET_PLATFORMS: *target_platforms
+      BASE_IMAGE: *base_image
+      IMAGE_NAME: *image_name
+    commands:
+      - .ci/image-all.sh
+
+  - name: image-sync
+    image: *skopeo_image
+    environment:
+      GOMAXPROCS: "4"
+      MALLOC_ARENA_MAX: "4"
+      ##
+      IMAGE_NAME: *image_name
+      EXT_IMAGE_NAME: *ext_image_name
+    commands:
+      - .ci/sync-all.sh
+
+## personal tweaks :)
+labels:
+  network: dmz

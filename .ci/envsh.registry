@@ -1,0 +1,14 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# (c) 2024, Konstantin Demin
+set -ef
+
+## setup image registry authentication
+export REGISTRY_AUTH_FILE="${PWD}/.ci/.auth.json"
+if ! [ -s "${REGISTRY_AUTH_FILE}" ] ; then
+    if [ -z "${REGISTRY_AUTH}" ] ; then
+        echo 'REGISTRY_AUTH is missing'
+        exit 1
+    fi
+    printf '%s' "${REGISTRY_AUTH}" > "${REGISTRY_AUTH_FILE}"
+fi

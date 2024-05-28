@@ -1,0 +1,66 @@
+#!/bin/sh
+# SPDX-License-Identifier: Apache-2.0
+# (c) 2024, Konstantin Demin
+set -ef
+
+## shifty-nifty shell goodies :)
+
+## do same thing as GitLab does for CI_COMMIT_REF_SLUG:
+## 1. lowercase string
+## 2. replace not allowed chars with '-' (squeezing repeats)
+##    allowed chars are: `0-9`, `a-z` and '-'
+## 3. remove leading and trailing '-' (if any)
+## 4. truncate string up to 63 chars
+## 5. remove trailing '-' (if any)
+ref_slug() {
+    printf '%s' "${1:?}" \
+    | sed -Ez 's/^(.+)$/\L\1/;s/[^0-9a-z]+/-/g;s/^-//;s/-$//;s/^(.{1,63}).*$/\1/;s/-$//' \
+    | tr -d '\0'
+}
+
+## normalize image tag
+## performs like ref_slug() except:
+## - symbols '_' and '.' are allowed too
+## - truncate string up to 96 chars
+## - squeeze symbol sequences:
+##   - '-' has higher priority than surrounding (leading and trailing) symbols
+##   - first symbol in sequence has higher priority than following symbols
+## NB: implementation is rather demonstrative than effective
+image_tag_norm() {
+    printf '%s' "${1:?}" \
+    | sed -Ez 's/^(.+)$/\L\1/;s/[^0-9a-z_.]+/-/g' \
+    | sed -Ez 's/\.+/./g;s/_+/_/g;s/[_.]+-/-/g;s/-[_.]+/-/g;s/([_.])[_.]+/\1/g' \
+    | sed -Ez 's/^[_.-]//;s/[_.-]$//;s/^(.{1,95}).*$/\1/;s/[_.-]$//' \
+    | tr -d '\0'
+}
+
+## misc CI things
+# CI_COMMIT_SHORT_SHA="${CI_COMMIT_SHA:0:8}"
+CI_COMMIT_SHORT_SHA=$(printf '%s' "${CI_COMMIT_SHA}" | cut -c 1-8)
+CI_COMMIT_REF_SLUG="$(ref_slug "${CI_COMMIT_BRANCH}")"
+if [ -n "${CI_COMMIT_SOURCE_BRANCH}" ] ; then
+    CI_COMMIT_REF_SLUG="$(ref_slug "${CI_COMMIT_SOURCE_BRANCH}")"
+fi
+
+## image tag(s)
+IMAGE_TAG="${CI_COMMIT_SHORT_SHA}-b${CI_PIPELINE_NUMBER}-${CI_COMMIT_REF_SLUG}"
+EXTRA_TAGS=$(image_tag_norm "branch-${CI_COMMIT_BRANCH}")
+if [ -n "${CI_COMMIT_TAG}" ] ; then
+    IMAGE_TAG="${CI_COMMIT_TAG}"
+    unset EXTRA_TAGS
+    ## TODO: think about "latest" tag: it should be error-prone for "backward tag push"
+    # EXTRA_TAGS='latest'
+else
+    if [ -n "${CI_COMMIT_SOURCE_BRANCH}" ] ; then
+        echo "Running on branch '${CI_COMMIT_SOURCE_BRANCH}'"
+    else
+        if [ "${CI_COMMIT_BRANCH}" != "${CI_REPO_DEFAULT_BRANCH}" ] ; then
+            echo "Running on branch '${CI_COMMIT_BRANCH}'"
+        else
+            IMAGE_TAG="${CI_COMMIT_SHORT_SHA}"
+        fi
+    fi
+fi
+IMAGE_TAG=$(image_tag_norm "${IMAGE_TAG}")
+
+export CI_COMMIT_SHORT_SHA CI_COMMIT_REF_SLUG IMAGE_TAG EXTRA_TAGS
