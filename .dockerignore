@@ -4,4 +4,3 @@ publish-nexus*
 .ci/*
 .woodpecker/*
 .woodpecker.yml
-dist/*

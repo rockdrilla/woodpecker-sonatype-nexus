@@ -46,6 +46,9 @@ $(OUTBIN):
 	    echo "!!! git information is asbent !!!" >&2 ; \
 	    GO_BUILDFLAGS="-buildvcs=false $${GO_BUILDFLAGS}" ; \
 	fi ; \
+	for i in $$(seq 1 3) ; do \
+	    if $(GO) get ; then break ; fi ; \
+	done ; \
 	$(GO) build -o $@ \
 	  $${GO_BUILDFLAGS} \
 	  $(if $(strip $(TAGS)),-tags '$(strip $(TAGS))') \
