@@ -34,7 +34,7 @@ func main() {
 	p.Plugin = plugin.New(plugin.Options{
 		Name:        "woodpecker-sonatype-nexus",
 		Description: "Woodpecker CI plugin to publish artifacts to Sonatype Nexus",
-		Version:     "0.0.2",
+		Version:     "0.0.3",
 		Flags:       p.Flags(),
 		Execute:     p.Execute,
 	})
