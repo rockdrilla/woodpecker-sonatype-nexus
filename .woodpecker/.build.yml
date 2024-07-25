@@ -5,9 +5,9 @@ when:
 variables:
   - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
   - &ext_image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
-  - &buildah_image 'quay.krd.sh/quay_io/containers/buildah:v1.35.3'
-  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.0'
-  - &go_image 'quay.krd.sh/golang:1.22.3-bookworm'
+  - &buildah_image 'quay.krd.sh/quay_io/containers/buildah:v1.35.4'
+  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.2'
+  - &go_image 'quay.krd.sh/golang:1.22.5-bookworm'
   - &base_image 'quay.krd.sh/gcr_io/distroless/static-debian12:debug-nonroot'
   ## value list depends on base image
   ## ref: https://github.com/GoogleContainerTools/distroless#debian-12
@@ -17,7 +17,7 @@ variables:
 ## ref: https://github.com/woodpecker-ci/plugin-git/releases
 clone:
   git:
-    image: quay.krd.sh/docker_io/woodpeckerci/plugin-git:2.5.0
+    image: quay.krd.sh/docker_io/woodpeckerci/plugin-git:2.5.1
 
 ## NB: ${variable} expressions are subject to pre-processing.
 ## ref: https://woodpecker-ci.org/docs/usage/environment
@@ -36,7 +36,7 @@ steps:
   - name: build-all
     image: *go_image
     environment:
-      GOMAXPROCS: "4"
+      GOMAXPROCS: "2"
       MALLOC_ARENA_MAX: "4"
       ##
       TARGET_PLATFORMS: *target_platforms

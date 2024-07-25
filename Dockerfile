@@ -1,4 +1,4 @@
-ARG GO_IMAGE=docker.io/library/golang:1.22.3-bookworm
+ARG GO_IMAGE=docker.io/library/golang:1.22.5-bookworm
 ARG BASE_IMAGE=gcr.io/distroless/static-debian12:debug-nonroot
 
 ## ---
@@ -16,7 +16,7 @@ WORKDIR /go/src
 
 COPY . .
 
-ENV GOMAXPROCS=4 \
+ENV GOMAXPROCS=2 \
     MALLOC_ARENA_MAX=4
 
 RUN go env | grep -F -e GOPROXY -e GOSUMDB ; \

@@ -5,13 +5,13 @@ when:
 variables:
   - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
   - &ext_image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
-  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.0'
+  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.2'
 
 ## kind of fixup (remove in near future)
 ## ref: https://github.com/woodpecker-ci/plugin-git/releases
 clone:
   git:
-    image: quay.krd.sh/docker_io/woodpeckerci/plugin-git:2.5.0
+    image: quay.krd.sh/docker_io/woodpeckerci/plugin-git:2.5.1
 
 ## NB: ${variable} expressions are subject to pre-processing.
 ## ref: https://woodpecker-ci.org/docs/usage/environment
