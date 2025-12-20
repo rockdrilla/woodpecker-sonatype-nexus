@@ -3,7 +3,7 @@ when:
     evaluate: 'LATEST_TAG == ""'
 
 variables:
-  - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
+  - &image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
   - &buildah_image 'quay.io/containers/buildah:v1.42.2'
   - &skopeo_image 'quay.io/containers/skopeo:v1.21.0'
   - &go_image 'docker.io/library/golang:1.25.5-trixie'
