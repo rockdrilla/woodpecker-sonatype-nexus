@@ -1,6 +1,6 @@
 #!/usr/bin/make -f
 # SPDX-License-Identifier: Apache-2.0
-# (c) 2024, Konstantin Demin
+# (c) 2024-2025, Konstantin Demin
 
 SHELL       :=/bin/sh
 .SHELLFLAGS :=-ec
