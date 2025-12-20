@@ -16,9 +16,7 @@ steps:
   settings:
     url: https://nexus.domain.com
     auth_base64:
-      # consult with #3406 for that syntax
-      # ref: https://github.com/woodpecker-ci/woodpecker/pull/3406
-      from_secret: nexus-auth-b64
+      from_secret: NEXUS_AUTH_BASE64
     upload:
       - repository: project-apt
         paths:

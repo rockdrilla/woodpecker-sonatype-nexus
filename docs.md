@@ -60,7 +60,7 @@ steps:
   settings:
     url: https://nexus.domain.com
     auth.base64:
-      from_secret: nexus-auth-b64
+      from_secret: NEXUS_AUTH_BASE64
     upload:
       - repository: project-apt
         paths:
