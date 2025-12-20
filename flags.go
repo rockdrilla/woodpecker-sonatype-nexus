@@ -4,7 +4,7 @@
 package main
 
 import (
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 type Settings struct {
@@ -20,8 +20,8 @@ type Settings struct {
 
 	// used only when "nexus.upload" is not set
 	Repository string
-	Paths      cli.StringSlice
-	Properties cli.StringSlice
+	Paths      []string
+	Properties []string
 }
 
 func (p *Plugin) Flags() []cli.Flag {
@@ -36,7 +36,7 @@ func (p *Plugin) flags() {
 		&cli.StringFlag{
 			Name:        "nexus.url",
 			Usage:       "Sonatype Nexus URL (e.g. \"https://nexus.domain.com\")",
-			EnvVars:     []string{"PLUGIN_NEXUS_URL", "NEXUS_URL"},
+			Sources:     cli.EnvVars("PLUGIN_NEXUS_URL", "NEXUS_URL"),
 			Destination: &p.Settings.RootUrl,
 			// avoid setting "Required" to "true" in order to achieve much shorter output
 		},
@@ -45,26 +45,26 @@ func (p *Plugin) flags() {
 		&cli.StringFlag{
 			Name:        "nexus.auth",
 			Usage:       "Sonatype Nexus - HTTP Basic Authentication (plain-text, either {username}:{password} or {token name}:{token pass})",
-			EnvVars:     []string{"PLUGIN_NEXUS_AUTH", "PLUGIN_AUTH", "NEXUS_AUTH"},
+			Sources:     cli.EnvVars("PLUGIN_NEXUS_AUTH", "PLUGIN_AUTH", "NEXUS_AUTH"),
 			Destination: &p.Settings.AuthPlain,
 		},
 		&cli.StringFlag{
 			Name:        "nexus.auth.base64",
 			Usage:       "Sonatype Nexus - HTTP Basic Authentication (base64-encoded, preferred)",
-			EnvVars:     []string{"PLUGIN_NEXUS_AUTH_BASE64", "PLUGIN_AUTH_BASE64", "NEXUS_AUTH_BASE64"},
+			Sources:     cli.EnvVars("PLUGIN_NEXUS_AUTH_BASE64", "PLUGIN_AUTH_BASE64", "NEXUS_AUTH_BASE64"),
 			Destination: &p.Settings.AuthBase64,
 		},
 		&cli.StringFlag{
 			Name:        "nexus.auth.header",
 			Usage:       "Sonatype Nexus - generic HTTP authentication header (in form {Header}={Value})",
-			EnvVars:     []string{"PLUGIN_NEXUS_AUTH_HEADER", "PLUGIN_AUTH_HEADER", "NEXUS_AUTH_HEADER"},
+			Sources:     cli.EnvVars("PLUGIN_NEXUS_AUTH_HEADER", "PLUGIN_AUTH_HEADER", "NEXUS_AUTH_HEADER"),
 			Destination: &p.Settings.AuthHttpHeader,
 		},
 
 		&cli.StringFlag{
 			Name:        "nexus.upload",
 			Usage:       "List of upload rules (JSON array)",
-			EnvVars:     []string{"PLUGIN_NEXUS_UPLOAD", "PLUGIN_UPLOAD", "NEXUS_UPLOAD"},
+			Sources:     cli.EnvVars("PLUGIN_NEXUS_UPLOAD", "PLUGIN_UPLOAD", "NEXUS_UPLOAD"),
 			Destination: &p.Settings.RawUploads,
 			Value:       "[]",
 		},
@@ -73,19 +73,19 @@ func (p *Plugin) flags() {
 		&cli.StringFlag{
 			Name:        "nexus.repository",
 			Usage:       "Repository name",
-			EnvVars:     []string{"NEXUS_REPOSITORY"},
+			Sources:     cli.EnvVars("NEXUS_REPOSITORY"),
 			Destination: &p.Settings.Repository,
 		},
 		&cli.StringSliceFlag{
 			Name:        "nexus.paths",
 			Usage:       "Comma-separated list of paths/globs",
-			EnvVars:     []string{"NEXUS_PATHS"},
+			Sources:     cli.EnvVars("NEXUS_PATHS"),
 			Destination: &p.Settings.Paths,
 		},
 		&cli.StringSliceFlag{
 			Name:        "nexus.properties",
 			Usage:       "Comma-separated list of properties (in form {key}={value})",
-			EnvVars:     []string{"NEXUS_PROPERTIES"},
+			Sources:     cli.EnvVars("NEXUS_PROPERTIES"),
 			Destination: &p.Settings.Properties,
 		},
 	}

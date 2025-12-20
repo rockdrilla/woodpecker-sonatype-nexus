@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/rs/zerolog/log"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func (p *Plugin) parseSettings() error {
@@ -92,28 +92,28 @@ func (p *Plugin) parseSettings() error {
 
 	if len(p.Uploads) != 0 {
 		reportSupersedingSetting("nexus.upload", "nexus.repository", p.Settings.Repository != "")
-		reportSupersedingSetting("nexus.upload", "nexus.paths", len(p.Settings.Paths.Value()) != 0)
-		reportSupersedingSetting("nexus.upload", "nexus.properties", len(p.Settings.Properties.Value()) != 0)
+		reportSupersedingSetting("nexus.upload", "nexus.paths", len(p.Settings.Paths) != 0)
+		reportSupersedingSetting("nexus.upload", "nexus.properties", len(p.Settings.Properties) != 0)
 
 		return nil
 	}
 
 	log.Info().Msg("\"nexus.upload\" is empty - trying to fill it with \"inline\" parameters")
 
-	var ur UploadRule
-
-	ur.Repository = p.Settings.Repository
-	ur.Paths = make([]string, len(p.Settings.Paths.Value()))
-	copy(ur.Paths, p.Settings.Paths.Value())
-
-	if ur.Repository == "" {
+	if p.Settings.Repository == "" {
 		return reportEmptySetting("nexus.repository")
 	}
-	if len(ur.Paths) == 0 {
+	if len(p.Settings.Paths) == 0 {
 		return reportEmptySetting("nexus.paths")
 	}
 
-	rawProps := p.Settings.Properties.Value()
+	var ur UploadRule
+
+	ur.Repository = p.Settings.Repository
+	ur.Paths = make([]string, len(p.Settings.Paths))
+	copy(ur.Paths, p.Settings.Paths)
+
+	rawProps := p.Settings.Properties
 	if len(rawProps) != 0 {
 		if rawProps[0] == "" {
 			return reportEmptySetting("nexus.properties")
