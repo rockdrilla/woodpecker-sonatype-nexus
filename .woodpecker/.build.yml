@@ -4,13 +4,12 @@ when:
 
 variables:
   - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
-  - &ext_image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
-  - &buildah_image 'quay.krd.sh/quay_io/containers/buildah:v1.36.0'
-  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.2'
-  - &go_image 'quay.krd.sh/golang:1.22.5-bookworm'
-  - &base_image 'quay.krd.sh/gcr_io/distroless/static-debian12:debug-nonroot'
+  - &buildah_image 'quay.io/containers/buildah:v1.42.2'
+  - &skopeo_image 'quay.io/containers/skopeo:v1.21.0'
+  - &go_image 'docker.io/library/golang:1.25.5-trixie'
+  - &base_image 'gcr.io/distroless/static-debian13:debug-nonroot'
   ## value list depends on base image
-  ## ref: https://github.com/GoogleContainerTools/distroless#debian-12
+  ## ref: https://github.com/GoogleContainerTools/distroless#debian-13
   - &target_platforms 'linux/amd64,linux/arm,linux/arm64,linux/ppc64le,linux/s390x'
 
 ## NB: ${variable} expressions are subject to pre-processing.
@@ -23,17 +22,15 @@ steps:
     environment:
       GOMAXPROCS: "4"
       MALLOC_ARENA_MAX: "4"
-    secrets: [ REGISTRY_AUTH ]
+      REGISTRY_AUTH:
+        from_secret: REGISTRY_AUTH
     commands:
-      - .ci/registry-login.sh quay.krd.sh docker.io
+      - .ci/registry-login.sh docker.io
 
   - name: build-all
     image: *go_image
     environment:
-      GOPROXY: "${GOPROXY},direct"
-      GOSUMDB: "${GOSUMDB}"
-      GOPRIVATE: "${GOPRIVATE}"
-      GOMAXPROCS: "2"
+      GOMAXPROCS: "4"
       MALLOC_ARENA_MAX: "4"
       ##
       TARGET_PLATFORMS: *target_platforms
@@ -62,7 +59,6 @@ steps:
       MALLOC_ARENA_MAX: "4"
       ##
       IMAGE_NAME: *image_name
-      EXT_IMAGE_NAME: *ext_image_name
     commands:
       - .ci/sync-all.sh
 

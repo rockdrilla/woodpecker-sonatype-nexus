@@ -16,6 +16,14 @@ IMAGE="${IMAGE_NAME}:${IMAGE_TAG}"
 ## used by .ci/image.sh
 export IMAGE_MANIFEST="${IMAGE}"
 
+manifest_push() {
+    for i in $(seq 1 3) ; do
+        buildah manifest push --retry 2 --retry-delay 60s "$@" || { sleep 5 ; continue ; }
+        return 0
+    done
+    return 1
+}
+
 if buildah manifest exists "${IMAGE}" ; then
     buildah manifest rm "${IMAGE}"
 fi
@@ -47,4 +55,4 @@ echo
 buildah images --all --noheading --format 'table {{.ID}} {{.Name}}:{{.Tag}} {{.Size}} {{.CreatedAtRaw}}' --filter "reference=${IMAGE_NAME}"
 echo
 
-buildah manifest push --all "${IMAGE}" "docker://${IMAGE}"
+manifest_push --all "${IMAGE}" "docker://${IMAGE}"

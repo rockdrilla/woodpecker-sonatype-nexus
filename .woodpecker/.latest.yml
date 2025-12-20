@@ -4,8 +4,7 @@ when:
 
 variables:
   - &image_name 'quay.krd.sh/krd/woodpecker-sonatype-nexus'
-  - &ext_image_name 'docker.io/rockdrilla/woodpecker-sonatype-nexus'
-  - &skopeo_image 'quay.krd.sh/quay_io/containers/skopeo:v1.15.2'
+  - &skopeo_image 'quay.io/containers/skopeo:v1.21.0'
 
 ## NB: ${variable} expressions are subject to pre-processing.
 ## ref: https://woodpecker-ci.org/docs/usage/environment
@@ -17,9 +16,10 @@ steps:
     environment:
       GOMAXPROCS: "4"
       MALLOC_ARENA_MAX: "4"
-    secrets: [ REGISTRY_AUTH ]
+      REGISTRY_AUTH:
+        from_secret: REGISTRY_AUTH
     commands:
-      - .ci/registry-login.sh quay.krd.sh docker.io
+      - .ci/registry-login.sh docker.io
 
   - name: image-sync-latest
     image: *skopeo_image
@@ -28,7 +28,6 @@ steps:
       MALLOC_ARENA_MAX: "4"
       ##
       IMAGE_NAME: *image_name
-      EXT_IMAGE_NAME: *ext_image_name
     commands:
       - .ci/sync-latest.sh
 

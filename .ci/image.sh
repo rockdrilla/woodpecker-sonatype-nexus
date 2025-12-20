@@ -10,13 +10,28 @@ set -ef
 ## produce _real_ BASE_IMAGE because "static-debian12:debug-nonroot" is not multiarch image (yet)
 export BASE_IMAGE="${BASE_IMAGE:?}-${GOARCH:?}"
 
-buildah pull \
+img_pull() {
+    for i in $(seq 1 3) ; do
+        buildah pull --retry 2 --retry-delay 60s "$@" || { sleep 5 ; continue ; }
+        return 0
+    done
+    return 1
+}
+
+img_build() {
+    for i in $(seq 1 3) ; do
+        buildah bud "$@" || { sleep 5 ; continue ; }
+        return 0
+    done
+    return 1
+}
+
+img_pull \
     --platform "${TARGET_PLATFORM}" \
-    --retry 3 --retry-delay 30s \
 "${BASE_IMAGE}"
 
 ## build image
-buildah bud \
+img_build \
     -t "${IMAGE_NAME}:${IMAGE_TAG}${PLATFORM_SUFFIX}" \
     -f ./Dockerfile.ci \
     ${IMAGE_MANIFEST:+ --manifest "${IMAGE_MANIFEST}" } \
